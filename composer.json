@@ -1,0 +1,25 @@
+{
+  "name": "tomgould/rsstojson",
+  "description": "Universal RSS/Atom/XML parser that outputs clean JSON-compatible arrays.",
+  "type": "library",
+  "license": "MIT",
+  "autoload": {
+    "psr-4": {
+      "RSStoJSON\\": "src/"
+    }
+  },
+  "bin": ["bin/rsstojson"],
+  "require": {
+    "php": ">=7.4",
+    "ext-libxml": "*",
+    "ext-curl": "*"
+  },
+  "require-dev": {
+    "phpunit/phpunit": "^9.5"
+  },
+  "scripts": {
+    "test": "phpunit --bootstrap vendor/autoload.php tests"
+  },
+  "minimum-stability": "dev",
+  "prefer-stable": true
+}
