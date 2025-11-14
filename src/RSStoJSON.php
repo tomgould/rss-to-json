@@ -47,7 +47,7 @@ class RSStoJSON
             }
 
             // Fix illegal bare ampersands in content (e.g. "Tom & Jerry")
-            // by replacing them with &amp; unless they’re already a valid XML entity.
+            // by replacing them with &amp; unless they're already a valid XML entity.
             $xmlContent = preg_replace(
                 '/&(?!amp;|lt;|gt;|quot;|apos;|#[0-9]+;|#x[0-9a-fA-F]+;)/',
                 '&amp;',
@@ -123,7 +123,8 @@ class RSStoJSON
         $data = curl_exec($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         $contentType = curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
-        if (!str_contains($contentType, 'xml')) {
+        // PHP 7.4 compatible: use stripos instead of str_contains
+        if (stripos($contentType, 'xml') === false) {
             curl_close($ch);
             return null;
         }
@@ -164,7 +165,7 @@ class RSStoJSON
 
         // Flatten single-child arrays
         foreach ($data as $key => $val) {
-            if (is_array($val) && count($val) === 1) {
+            if (is_array($val) && count($val) === 1 && array_key_exists(0, $val)) {
                 $data[$key] = $val[0];
             }
         }
