@@ -3,9 +3,16 @@
   "description": "Universal RSS/Atom/XML parser that outputs clean JSON-compatible arrays.",
   "type": "library",
   "license": "MIT",
+  "keywords": ["rss", "atom", "xml", "mrss", "feed", "parser", "json"],
+  "authors": [
+    {
+      "name": "Tom Gould",
+      "email": "your-email@example.com"
+    }
+  ],
   "autoload": {
     "psr-4": {
-      "RSStoJSON\\": "src/"
+      "TomGould\\RSSToJson\\": "src/"
     }
   },
   "bin": ["bin/rsstojson"],
@@ -20,7 +27,7 @@
   "scripts": {
     "test": "phpunit --bootstrap vendor/autoload.php tests"
   },
-  "minimum-stability": "dev",
+  "minimum-stability": "stable",
   "prefer-stable": true
 }
 

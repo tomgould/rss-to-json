@@ -27,9 +27,9 @@ composer require tomgould/rsstojson
 
 require 'vendor/autoload.php';
 
-use RSStoJSON\RSStoJSON;
+use TomGould\RSSToJson\RSSToJson;
 
-$parser = new RSStoJSON();
+$parser = new RSSToJson();
 $feed = $parser->parse('https://example.com/feed.xml');
 echo json_encode($feed, JSON_PRETTY_PRINT);
 ```
@@ -40,9 +40,9 @@ echo json_encode($feed, JSON_PRETTY_PRINT);
 
 require 'vendor/autoload.php';
 
-use RSStoJSON\RSStoJSON;
+use TomGould\RSSToJson\RSSToJson;
 
-$parser = new RSStoJSON();
+$parser = new RSSToJson();
 $feed = $parser->parse('/path/to/local/feed.xml');
 echo json_encode($feed, JSON_PRETTY_PRINT);
 ```
@@ -102,4 +102,3 @@ MIT — free for commercial and personal use.
 ## 🤝 Contributing
 
 Issues and pull requests are welcome on the GitHub repository.
-

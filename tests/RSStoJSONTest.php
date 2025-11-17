@@ -1,13 +1,13 @@
 <?php
 
 use PHPUnit\Framework\TestCase;
-use RSStoJSON\RSStoJSON;
+use TomGould\RSSToJson\RSSToJson;
 
 class RSStoJSONTest extends TestCase
 {
     public function testParsesValidMRSSFeed()
     {
-        $parser = new RSStoJSON();
+        $parser = new RSSToJson();
         $result = $parser->parse(__DIR__ . '/sample-mrss.xml');
 
         $this->assertIsArray($result);
@@ -19,7 +19,7 @@ class RSStoJSONTest extends TestCase
 
     public function testParsesVideoMetadata()
     {
-        $parser = new RSStoJSON();
+        $parser = new RSSToJson();
         $result = $parser->parse(__DIR__ . '/sample-mrss.xml');
 
         $firstItem = $result['channel']['item'][0];
@@ -35,7 +35,7 @@ class RSStoJSONTest extends TestCase
 
     public function testParsesMediaThumbnails()
     {
-        $parser = new RSStoJSON();
+        $parser = new RSSToJson();
         $result = $parser->parse(__DIR__ . '/sample-mrss.xml');
 
         $firstItem = $result['channel']['item'][0];
@@ -51,7 +51,7 @@ class RSStoJSONTest extends TestCase
 
     public function testReturnsNullForInvalidFile()
     {
-        $parser = new RSStoJSON();
+        $parser = new RSSToJson();
         $result = $parser->parse('/path/to/nowhere.xml');
 
         $this->assertNull($result);
@@ -59,7 +59,7 @@ class RSStoJSONTest extends TestCase
 
     public function testHandlesNamespaces()
     {
-        $parser = new RSStoJSON();
+        $parser = new RSSToJson();
         $result = $parser->parse(__DIR__ . '/sample-mrss.xml');
 
         $firstItem = $result['channel']['item'][0];

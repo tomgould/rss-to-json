@@ -21,7 +21,7 @@ if (!$autoloadFound) {
     exit(1);
 }
 
-use RSStoJSON\RSStoJSON;
+use TomGould\RSSToJson\RSSToJson;
 
 if ($argc < 2) {
     fwrite(STDERR, "Usage: rsstojson <url-or-path>\n");
@@ -33,7 +33,7 @@ if (!file_exists($argv[1]) && !filter_var($argv[1], FILTER_VALIDATE_URL)) {
     exit(3);
 }
 
-$parser = new RSStoJSON();
+$parser = new RSSToJson();
 $result = $parser->parse($argv[1]);
 
 if ($result === null) {
@@ -42,3 +42,4 @@ if ($result === null) {
 }
 
 echo json_encode($result, JSON_PRETTY_PRINT) . PHP_EOL;
+
