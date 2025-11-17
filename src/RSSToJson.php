@@ -183,5 +183,3 @@ class RSSToJson
     }
 }
 
---- DELETE: src/RSStoJSON.php
-
