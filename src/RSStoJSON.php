@@ -123,8 +123,9 @@ class RSStoJSON
         $data = curl_exec($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         $contentType = curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
+
         // PHP 7.4 compatible: use stripos instead of str_contains
-        if (stripos($contentType, 'xml') === false) {
+        if ($contentType === false || stripos($contentType, 'xml') === false) {
             curl_close($ch);
             return null;
         }
