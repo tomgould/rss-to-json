@@ -1,7 +1,25 @@
 #!/usr/bin/env php
 <?php
 
-require __DIR__ . '/../vendor/autoload.php';
+// Try to find the autoload file in different possible locations
+$autoloadPaths = [
+    __DIR__ . '/../../../autoload.php',  // Installed as a dependency
+    __DIR__ . '/../vendor/autoload.php', // Installed in development
+];
+
+$autoloadFound = false;
+foreach ($autoloadPaths as $path) {
+    if (file_exists($path)) {
+        require $path;
+        $autoloadFound = true;
+        break;
+    }
+}
+
+if (!$autoloadFound) {
+    fwrite(STDERR, "Error: Could not find Composer autoload file.\n");
+    exit(1);
+}
 
 use RSStoJSON\RSStoJSON;
 
@@ -24,4 +42,3 @@ if ($result === null) {
 }
 
 echo json_encode($result, JSON_PRETTY_PRINT) . PHP_EOL;
-
