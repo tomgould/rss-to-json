@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom" xmlns:atom="http://www.w3.org/2005/Atom">
+  <title>Aliased Atom</title>
+  <atom:subtitle>Written with the prefix</atom:subtitle>
+  <id>urn:uuid:aliased</id>
+  <entry>
+    <title>Entry one</title>
+    <atom:id>urn:uuid:aliased-1</atom:id>
+  </entry>
+</feed>

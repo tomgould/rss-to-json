@@ -161,6 +161,28 @@ class FeedFormatsTest extends TestCase
         $this->assertSame('2026-10-17', $channel['item'][1]['dc:date']);
     }
 
+    public function testNamespaceBoundToTwoPrefixesKeepsTheTwoZeroOutput(): void
+    {
+        // 2.0 matched prefixed children by namespace URI, so both prefixes
+        // list every element in the Atom namespace. RSS output must not change.
+        $channel = $this->parseFixture('feedburner.xml');
+        $links = [
+            ['@attributes' => ['href' => 'https://example.com/feed.xml', 'rel' => 'self', 'type' => 'application/rss+xml']],
+            ['@attributes' => ['rel' => 'hub', 'href' => 'https://pubsubhubbub.appspot.com/']],
+        ];
+
+        $this->assertSame($links, $channel['atom:link']);
+        $this->assertSame($links, $channel['atom10:link']);
+    }
+
+    public function testPrefixAliasingTheDefaultNamespaceIsReadOnce(): void
+    {
+        $channel = $this->parseFixture('atom-prefixed.xml');
+
+        $this->assertSame(['atom:subtitle', 'title', 'id', 'entry', 'item'], array_keys($channel));
+        $this->assertSame([['atom:id' => 'urn:uuid:aliased-1', 'title' => 'Entry one']], $channel['item']);
+    }
+
     public function testSingleItemIsStillAList(): void
     {
         $channel = $this->parseFixture('modules.xml');

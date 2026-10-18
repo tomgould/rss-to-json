@@ -633,15 +633,21 @@ class RSSToJson
             $data['@attributes'][$attrName] = (string)$attrValue;
         }
 
-        // Prefixed children, e.g. media:content. Match on the prefix rather
-        // than the namespace URI so that an element is only ever read once:
-        // the default namespace (prefix '') is covered by children() below,
-        // and a URI bound to two prefixes no longer yields two copies.
-        foreach (array_keys($namespaces) as $prefix) {
+        // Prefixed children, e.g. media:content. The default namespace
+        // (prefix '') is skipped because children() below already reads it.
+        // Other prefixes match on the namespace URI, as in 2.0, so a URI
+        // bound to two prefixes (atom: and atom10: in FeedBurner feeds)
+        // keeps its 2.0 output. A prefix bound to the default namespace's
+        // URI matches on the prefix instead, or the unprefixed elements in
+        // that namespace would be read a second time.
+        $defaultUri = $namespaces[''] ?? null;
+        foreach ($namespaces as $prefix => $uri) {
+            $prefix = (string) $prefix;
             if ($prefix === '') {
                 continue;
             }
-            foreach ($element->children($prefix, true) as $childName => $child) {
+            $children = $uri === $defaultUri ? $element->children($prefix, true) : $element->children($uri);
+            foreach ($children as $childName => $child) {
                 $qualifiedName = $prefix . ':' . $childName;
                 $data[$qualifiedName][] = $this->parseElement($child, $namespaces);
             }
