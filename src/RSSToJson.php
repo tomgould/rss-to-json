@@ -558,7 +558,19 @@ class RSSToJson
                 return strlen($chunk);
             },
         ]);
-        $this->restrictProtocols($ch);
+
+        // Limit cURL to http and https, for the request and any redirect.
+        // libcurl 7.85 deprecated the bitmask options in favour of string
+        // ones, which PHP exposes from 8.3 when libcurl supports them.
+        $protocolsOption = defined('CURLOPT_PROTOCOLS_STR') ? constant('CURLOPT_PROTOCOLS_STR') : null;
+        $redirProtocolsOption = defined('CURLOPT_REDIR_PROTOCOLS_STR') ? constant('CURLOPT_REDIR_PROTOCOLS_STR') : null;
+        $protocolsRestricted = is_int($protocolsOption) && is_int($redirProtocolsOption)
+            && curl_setopt($ch, $protocolsOption, 'http,https')
+            && curl_setopt($ch, $redirProtocolsOption, 'http,https');
+        if (!$protocolsRestricted) {
+            curl_setopt($ch, CURLOPT_PROTOCOLS, CURLPROTO_HTTP | CURLPROTO_HTTPS);
+            curl_setopt($ch, CURLOPT_REDIR_PROTOCOLS, CURLPROTO_HTTP | CURLPROTO_HTTPS);
+        }
 
         if ($target['ip'] !== null) {
             $address = strpos($target['ip'], ':') === false ? $target['ip'] : '[' . $target['ip'] . ']';
@@ -586,7 +598,7 @@ class RSSToJson
             $this->lastError = sprintf('Response from %s is larger than max_size (%d bytes)', $url, $maxSize);
             return null;
         }
-        if ($target['ip'] !== null && is_string($primaryIp) && $primaryIp !== '' && !$this->isAddressAllowed($primaryIp)) {
+        if ($target['ip'] !== null && $primaryIp !== '' && !$this->isAddressAllowed($primaryIp)) {
             // Backstop: should not happen while the address is pinned.
             $this->lastError = sprintf('Refusing response from %s (%s): private or reserved address', $target['host'], $primaryIp);
             return null;
@@ -605,32 +617,12 @@ class RSSToJson
     }
 
     /**
-     * Limit cURL to http and https, for the request and for any redirect.
-     *
-     * @param resource|\CurlHandle $ch
-     */
-    private function restrictProtocols($ch): void
-    {
-        // libcurl 7.85 deprecated the bitmask options in favour of the string
-        // ones, which PHP exposes from 8.3.
-        if (defined('CURLOPT_PROTOCOLS_STR') && defined('CURLOPT_REDIR_PROTOCOLS_STR')
-            && curl_setopt($ch, constant('CURLOPT_PROTOCOLS_STR'), 'http,https')
-            && curl_setopt($ch, constant('CURLOPT_REDIR_PROTOCOLS_STR'), 'http,https')
-        ) {
-            return;
-        }
-
-        curl_setopt($ch, CURLOPT_PROTOCOLS, CURLPROTO_HTTP | CURLPROTO_HTTPS);
-        curl_setopt($ch, CURLOPT_REDIR_PROTOCOLS, CURLPROTO_HTTP | CURLPROTO_HTTPS);
-    }
-
-    /**
      * Recursively parse a SimpleXMLElement into a full array.
      * Includes attributes and handles namespaces.
      *
      * @param \SimpleXMLElement $element
-     * @param array $namespaces
-     * @return array|string|null
+     * @param array<string> $namespaces Prefix => URI, from getNamespaces(true)
+     * @return array<string, mixed>|string A string when the element holds only text
      */
     private function parseElement(\SimpleXMLElement $element, array $namespaces = [])
     {
@@ -662,7 +654,7 @@ class RSSToJson
 
         // Flatten single-child arrays
         foreach ($data as $key => $val) {
-            if (is_array($val) && count($val) === 1 && array_key_exists(0, $val)) {
+            if (count($val) === 1 && array_key_exists(0, $val)) {
                 $data[$key] = $val[0];
             }
         }
