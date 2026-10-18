@@ -214,6 +214,91 @@ class RemoteFetchTest extends TestCase
         $this->assertStringContainsString('HTTP 404', (string) $parser->getLastError());
     }
 
+    public function testBlockPrivateIpsRefusesLoopback(): void
+    {
+        $parser = new RSSToJson(['block_private_ips' => true]);
+
+        $this->assertNull($parser->parseUrl($this->url('/rss2')));
+        $this->assertStringContainsString('(127.0.0.1): private or reserved address', (string) $parser->getLastError());
+    }
+
+    public function testBlockPrivateIpsChecksResolvedAddresses(): void
+    {
+        $parser = new RSSToJson(['block_private_ips' => true]);
+        $url = str_replace('127.0.0.1', 'localhost', $this->url('/rss2'));
+
+        $this->assertNull($parser->parseUrl($url));
+        $this->assertStringContainsString('Refusing to connect to localhost', (string) $parser->getLastError());
+    }
+
+    public function testBlockPrivateIpsIsOffByDefault(): void
+    {
+        $this->assertIsArray((new RSSToJson())->parseUrl($this->url('/rss2')));
+    }
+
+    public function testBlockPrivateIpsFetchesAllowedAddresses(): void
+    {
+        $parser = $this->parserAllowingTestServer();
+
+        $result = $parser->parseUrl($this->url('/rss2'));
+        $this->assertIsArray($result, (string) $parser->getLastError());
+        $this->assertSame('Example News', $result['channel']['title']);
+
+        $redirected = $parser->parseUrl($this->url('/redirect?to=' . rawurlencode('/atom')));
+        $this->assertIsArray($redirected, (string) $parser->getLastError());
+    }
+
+    /**
+     * @dataProvider privateRedirectProvider
+     */
+    public function testBlockPrivateIpsChecksEveryRedirect(string $target, string $address): void
+    {
+        $parser = $this->parserAllowingTestServer();
+
+        $this->assertNull($parser->parseUrl($this->url('/redirect?to=' . rawurlencode($target))));
+        $this->assertStringContainsString("($address): private or reserved address", (string) $parser->getLastError());
+    }
+
+    /**
+     * @return array<string, array{string, string}>
+     */
+    public function privateRedirectProvider(): array
+    {
+        return [
+            'cloud metadata' => ['http://169.254.169.254/latest/meta-data/', '169.254.169.254'],
+            'private network' => ['http://10.0.0.1/feed.xml', '10.0.0.1'],
+            'other loopback address' => ['http://127.0.0.2/feed.xml', '127.0.0.2'],
+            'IPv6 loopback' => ['http://[::1]/feed.xml', '::1'],
+            'IPv4-mapped IPv6' => ['http://[::ffff:169.254.169.254]/', '::ffff:169.254.169.254'],
+        ];
+    }
+
+    public function testBlockPrivateIpsRefusesAmbiguousUrls(): void
+    {
+        $parser = $this->parserAllowingTestServer();
+        $withCredentials = str_replace('http://', 'http://user:pass@', $this->url('/rss2'));
+
+        $this->assertNull($parser->parseUrl($withCredentials));
+        $this->assertStringContainsString('credentials, whitespace or backslashes', (string) $parser->getLastError());
+
+        $this->assertNull($parser->parseUrl($this->url('/rss2') . '\\@169.254.169.254/'));
+        $this->assertStringContainsString('credentials, whitespace or backslashes', (string) $parser->getLastError());
+    }
+
+    /**
+     * A parser with block_private_ips on that still lets the tests reach the
+     * local server at 127.0.0.1, and nothing else on loopback.
+     */
+    private function parserAllowingTestServer(): RSSToJson
+    {
+        return new class (['block_private_ips' => true]) extends RSSToJson {
+            protected function isAddressAllowed(string $ip): bool
+            {
+                return $ip === '127.0.0.1' || parent::isAddressAllowed($ip);
+            }
+        };
+    }
+
     /**
      * @dataProvider invalidOptionsProvider
      * @param array<string, mixed> $options
@@ -238,6 +323,7 @@ class RemoteFetchTest extends TestCase
             'negative max_redirects' => [['max_redirects' => -1]],
             'zero max_size' => [['max_size' => 0]],
             'float max_size' => [['max_size' => 1.5]],
+            'non-bool block_private_ips' => [['block_private_ips' => 1]],
             'non-string user_agent' => [['user_agent' => false]],
         ];
     }

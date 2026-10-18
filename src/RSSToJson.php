@@ -33,11 +33,12 @@ class RSSToJson
         'connect_timeout' => 5,
         'max_redirects' => 5,
         'max_size' => 20971520,
+        'block_private_ips' => false,
         'user_agent' => 'RSStoJSON/1.0 (+http://dealmobile.co.uk)',
     ];
 
     /**
-     * @var array{timeout: int|float, connect_timeout: int|float, max_redirects: int, max_size: int, user_agent: string}
+     * @var array{timeout: int|float, connect_timeout: int|float, max_redirects: int, max_size: int, block_private_ips: bool, user_agent: string}
      */
     private $options;
 
@@ -55,6 +56,10 @@ class RSSToJson
      * - max_redirects (int, default 5): redirects to follow; 0 follows none.
      * - max_size (int, default 20971520, i.e. 20 MiB): largest response body
      *   accepted, in bytes.
+     * - block_private_ips (bool, default false): refuse to connect to private,
+     *   loopback, link-local, reserved and cloud metadata addresses, checked
+     *   for the URL and every redirect before connecting. Turn this on when
+     *   the URL comes from someone you don't trust. See checkUrl().
      * - user_agent (string): the User-Agent header to send.
      *
      * @param array<string, mixed> $options
@@ -80,6 +85,9 @@ class RSSToJson
         if (!is_int($options['max_size']) || $options['max_size'] < 1) {
             throw new \InvalidArgumentException('Option "max_size" must be a positive integer (bytes)');
         }
+        if (!is_bool($options['block_private_ips'])) {
+            throw new \InvalidArgumentException('Option "block_private_ips" must be a boolean');
+        }
         if (!is_string($options['user_agent'])) {
             throw new \InvalidArgumentException('Option "user_agent" must be a string');
         }
@@ -89,6 +97,7 @@ class RSSToJson
             'connect_timeout' => $options['connect_timeout'],
             'max_redirects' => $options['max_redirects'],
             'max_size' => $options['max_size'],
+            'block_private_ips' => $options['block_private_ips'],
             'user_agent' => $options['user_agent'],
         ];
     }
@@ -360,11 +369,12 @@ class RSSToJson
         $redirects = 0;
 
         while (true) {
-            if (!$this->checkUrl($url)) {
+            $target = $this->checkUrl($url);
+            if ($target === null) {
                 return null;
             }
 
-            $response = $this->request($url, $deadline);
+            $response = $this->request($url, $target, $deadline);
             if ($response === null) {
                 return null;
             }
@@ -396,33 +406,118 @@ class RSSToJson
      * Check that a URL may be requested: it must be absolute and use http or
      * https.
      *
+     * With block_private_ips on, the host is also resolved here and every
+     * address it resolves to must pass isAddressAllowed(). The request is
+     * then pinned to one of those addresses, so a second DNS lookup cannot
+     * swap in another (DNS rebinding). URLs with credentials, whitespace or
+     * backslashes are refused in this mode, because URL parsers disagree on
+     * where such hosts end.
+     *
      * @param string $url
-     * @return bool
+     * @return array{host: string, port: int, ip: string|null}|null Null if refused
      */
-    private function checkUrl(string $url): bool
+    private function checkUrl(string $url): ?array
     {
         $parts = parse_url($url);
         $scheme = strtolower($parts['scheme'] ?? '');
         if ($scheme !== '' && $scheme !== 'http' && $scheme !== 'https') {
             $this->lastError = sprintf('Refusing %s URL: only http and https are allowed', $scheme);
-            return false;
+            return null;
         }
         if ($scheme === '' || !isset($parts['host']) || $parts['host'] === '') {
             $this->lastError = "Invalid URL: $url";
-            return false;
+            return null;
         }
 
-        return true;
+        // parse_url() keeps the brackets around an IPv6 literal.
+        $host = trim($parts['host'], '[]');
+        $port = $parts['port'] ?? ($scheme === 'https' ? 443 : 80);
+        $target = ['host' => $host, 'port' => $port, 'ip' => null];
+        if (!$this->options['block_private_ips']) {
+            return $target;
+        }
+
+        if (isset($parts['user']) || isset($parts['pass']) || preg_match('/[\x00-\x20\x7F\\\\]/', $url)) {
+            $this->lastError = "Refusing URL with credentials, whitespace or backslashes: $url";
+            return null;
+        }
+
+        $addresses = filter_var($host, FILTER_VALIDATE_IP) !== false ? [$host] : $this->resolveHost($host);
+        if ($addresses === []) {
+            $this->lastError = "Could not resolve host: $host";
+            return null;
+        }
+        foreach ($addresses as $address) {
+            if (!$this->isAddressAllowed($address)) {
+                $this->lastError = sprintf('Refusing to connect to %s (%s): private or reserved address', $host, $address);
+                return null;
+            }
+        }
+
+        // Prefer IPv4, which every libcurl accepts in CURLOPT_RESOLVE.
+        $target['ip'] = $addresses[0];
+        foreach ($addresses as $address) {
+            if (strpos($address, ':') === false) {
+                $target['ip'] = $address;
+                break;
+            }
+        }
+
+        return $target;
+    }
+
+    /**
+     * Decide whether block_private_ips allows connecting to an address.
+     *
+     * Override this to allow particular internal addresses, for example a
+     * known feed server on your own network.
+     *
+     * @param string $ip An IPv4 or IPv6 address
+     * @return bool
+     */
+    protected function isAddressAllowed(string $ip): bool
+    {
+        return IpAddress::isPublic($ip);
+    }
+
+    /**
+     * Resolve a host name to its IPv4 and IPv6 addresses.
+     *
+     * @param string $host
+     * @return string[]
+     */
+    private function resolveHost(string $host): array
+    {
+        $addresses = [];
+
+        $ipv4 = @gethostbynamel($host);
+        if (is_array($ipv4)) {
+            $addresses = $ipv4;
+        }
+
+        if (function_exists('dns_get_record')) {
+            $records = @dns_get_record($host, DNS_AAAA);
+            if (is_array($records)) {
+                foreach ($records as $record) {
+                    if (isset($record['ipv6']) && is_string($record['ipv6'])) {
+                        $addresses[] = $record['ipv6'];
+                    }
+                }
+            }
+        }
+
+        return array_values(array_unique($addresses));
     }
 
     /**
      * Make a single GET request without following redirects.
      *
      * @param string $url
+     * @param array{host: string, port: int, ip: string|null} $target From checkUrl()
      * @param float $deadline microtime(true) value by which the whole fetch must finish
      * @return array{status: int, content_type: string, location: string, body: string}|null
      */
-    private function request(string $url, float $deadline): ?array
+    private function request(string $url, array $target, float $deadline): ?array
     {
         $remainingMs = (int) floor(($deadline - microtime(true)) * 1000);
         if ($remainingMs < 1) {
@@ -465,12 +560,23 @@ class RSSToJson
         ]);
         $this->restrictProtocols($ch);
 
+        if ($target['ip'] !== null) {
+            $address = strpos($target['ip'], ':') === false ? $target['ip'] : '[' . $target['ip'] . ']';
+            curl_setopt_array($ch, [
+                // Connect to the address that was checked, not a fresh lookup.
+                CURLOPT_RESOLVE => [sprintf('%s:%d:%s', $target['host'], $target['port'], $address)],
+                // A proxy would make its own connection, out of our sight.
+                CURLOPT_PROXY => '',
+            ]);
+        }
+
         $ok = curl_exec($ch);
         $errno = curl_errno($ch);
         $error = curl_error($ch);
         $status = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
         $contentType = curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
         $location = curl_getinfo($ch, CURLINFO_REDIRECT_URL);
+        $primaryIp = curl_getinfo($ch, CURLINFO_PRIMARY_IP);
         if (\PHP_VERSION_ID < 80000) {
             // A no-op since PHP 8.0 and deprecated in 8.5.
             curl_close($ch);
@@ -478,6 +584,11 @@ class RSSToJson
 
         if ($tooLarge || $errno === 63) { // 63 is CURLE_FILESIZE_EXCEEDED
             $this->lastError = sprintf('Response from %s is larger than max_size (%d bytes)', $url, $maxSize);
+            return null;
+        }
+        if ($target['ip'] !== null && is_string($primaryIp) && $primaryIp !== '' && !$this->isAddressAllowed($primaryIp)) {
+            // Backstop: should not happen while the address is pinned.
+            $this->lastError = sprintf('Refusing response from %s (%s): private or reserved address', $target['host'], $primaryIp);
             return null;
         }
         if ($ok === false || $errno !== 0) {
