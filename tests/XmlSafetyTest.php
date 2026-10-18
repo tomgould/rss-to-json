@@ -84,7 +84,9 @@ class XmlSafetyTest extends TestCase
         // the libxml flags hold on their own.
         $parser = new RSSToJson();
         $method = new \ReflectionMethod(RSSToJson::class, 'loadXml');
-        $method->setAccessible(true);
+        if (\PHP_VERSION_ID < 80100) {
+            $method->setAccessible(true); // Needed before 8.1, deprecated in 8.5.
+        }
         $loads = $this->recordEntityLoads();
 
         $element = $method->invoke($parser, $this->xxeFeed());
