@@ -37,7 +37,7 @@ $parser = new RSSToJson();
 $result = $parser->parse($argv[1]);
 
 if ($result === null) {
-    fwrite(STDERR, "Failed to parse feed\n");
+    fwrite(STDERR, "Failed to parse feed: " . $parser->getLastError() . "\n");
     exit(2);
 }
 
