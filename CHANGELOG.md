@@ -18,7 +18,7 @@ The public API is backward compatible: `new RSSToJson()` and `parse()` work as b
 
 - XML is loaded with `LIBXML_NONET` and never with `LIBXML_NOENT`, and on PHP 7.4 the libxml entity loader is disabled while parsing, so external entities and DTDs are not loaded on any supported PHP version.
 - URL fetching is limited to `http` and `https`, for redirects too. Redirects are capped, the timeout now covers the whole fetch, a connect timeout is set, and the response size is capped.
-- New opt-in `block_private_ips` option refuses private, loopback, link-local, reserved and cloud metadata addresses, for the URL and every redirect, and pins the connection to the checked address.
+- New opt-in `block_private_ips` option refuses private, loopback, link-local, reserved and cloud metadata addresses, for the URL and every redirect, and pins the connection to the checked address. On PHP 8.4 and later the connected address is checked again before the request is sent.
 
 ### Added
 
@@ -35,7 +35,7 @@ The public API is backward compatible: `new RSSToJson()` and `parse()` work as b
 - Responses over 20 MiB are refused. There used to be no limit. Set `max_size` to change it.
 - The 10-second timeout now covers the whole fetch, redirects included, and connecting has its own 5-second limit.
 - Local files with a bare `&` or an entity XML doesn't define, such as `&nbsp;`, now parse instead of returning `null`. The undefined entity comes back as literal text, as it already did for remote feeds.
-- Entities declared in a feed's own DTD (for example `<!ENTITY copy "...">`) are no longer expanded in local files. They come back as literal text, such as `&copy;`, as they already did for remote feeds.
+- Entities declared in a feed's own DTD (for example `<!ENTITY copy "...">`) are no longer expanded in local files (UTF-16 files excepted). They come back as literal text, such as `&copy;`, as they already did for remote feeds.
 - Remote feeds with a bare `&` inside CDATA now return it as `&` instead of `&amp;`.
 
 ### Packaging

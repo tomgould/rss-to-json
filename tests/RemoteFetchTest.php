@@ -286,6 +286,49 @@ class RemoteFetchTest extends TestCase
     }
 
     /**
+     * @dataProvider nonAsciiHostProvider
+     */
+    public function testBlockPrivateIpsRefusesHostsCurlWouldDecode(string $host): void
+    {
+        $parser = $this->parserAllowingTestServer();
+        $port = (string) parse_url(self::$baseUrl, PHP_URL_PORT);
+
+        $this->assertNull($parser->parseUrl("http://$host:$port/rss2"));
+        $this->assertStringContainsString('not plain ASCII', (string) $parser->getLastError());
+    }
+
+    /**
+     * @return array<string, array{string}>
+     */
+    public function nonAsciiHostProvider(): array
+    {
+        return [
+            'percent-encoded' => ['local%68ost'],
+            'percent-encoded dot' => ['x%2eexample.com'],
+            'Unicode' => ["local\u{24D7}ost"],
+        ];
+    }
+
+    public function testBlockPrivateIpsChecksTheConnectedAddress(): void
+    {
+        // Allows the address when the URL is checked, then refuses it when
+        // cURL connects, as if DNS had changed in between. PHP 8.4+ refuses
+        // before sending the request; older versions discard the response.
+        $parser = new class (['block_private_ips' => true]) extends RSSToJson {
+            /** @var int */
+            private $calls = 0;
+
+            protected function isAddressAllowed(string $ip): bool
+            {
+                return $this->calls++ === 0;
+            }
+        };
+
+        $this->assertNull($parser->parseUrl($this->url('/rss2')));
+        $this->assertStringContainsString('(127.0.0.1): private or reserved address', (string) $parser->getLastError());
+    }
+
+    /**
      * A parser with block_private_ips on that still lets the tests reach the
      * local server at 127.0.0.1, and nothing else on loopback.
      */

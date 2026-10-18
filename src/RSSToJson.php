@@ -17,6 +17,10 @@ namespace TomGould\RSSToJson;
  * - The XML is loaded with network access disabled and without entity
  *   substitution (see loadXml()).
  *
+ * UTF-16 input skips the first two steps, which assume an ASCII-compatible
+ * encoding, so entities declared in its own DTD are expanded. External
+ * entities are still never loaded.
+ *
  * The parsed result is wrapped as ['channel' => [...]]. Elements become keys,
  * repeated elements become lists, attributes go under '@attributes', text
  * beside attributes or children goes under '@value', and prefixed elements
@@ -59,7 +63,9 @@ class RSSToJson
      * - block_private_ips (bool, default false): refuse to connect to private,
      *   loopback, link-local, reserved and cloud metadata addresses, checked
      *   for the URL and every redirect before connecting. Turn this on when
-     *   the URL comes from someone you don't trust. See checkUrl().
+     *   the URL comes from someone you don't trust. See checkUrl(). DNS
+     *   lookups for this check cannot be interrupted, so a slow resolver can
+     *   push a fetch past the timeout.
      * - user_agent (string): the User-Agent header to send.
      *
      * @param array<string, mixed> $options
@@ -410,8 +416,9 @@ class RSSToJson
      * address it resolves to must pass isAddressAllowed(). The request is
      * then pinned to one of those addresses, so a second DNS lookup cannot
      * swap in another (DNS rebinding). URLs with credentials, whitespace or
-     * backslashes are refused in this mode, because URL parsers disagree on
-     * where such hosts end.
+     * backslashes, and host names that are not plain ASCII (percent-encoded
+     * or Unicode; use the xn-- form instead), are refused in this mode,
+     * because PHP and libcurl could read a different host from them.
      *
      * @param string $url
      * @return array{host: string, port: int, ip: string|null}|null Null if refused
@@ -442,7 +449,13 @@ class RSSToJson
             return null;
         }
 
-        $addresses = filter_var($host, FILTER_VALIDATE_IP) !== false ? [$host] : $this->resolveHost($host);
+        $isIpLiteral = filter_var($host, FILTER_VALIDATE_IP) !== false;
+        if (!$isIpLiteral && !preg_match('/^(?:[a-z0-9_](?:[a-z0-9_-]*[a-z0-9_])?\.)*[a-z0-9_](?:[a-z0-9_-]*[a-z0-9_])?\.?$/i', $host)) {
+            $this->lastError = "Refusing host name that is not plain ASCII: $host";
+            return null;
+        }
+
+        $addresses = $isIpLiteral ? [$host] : $this->resolveHost($host);
         if ($addresses === []) {
             $this->lastError = "Could not resolve host: $host";
             return null;
@@ -573,13 +586,31 @@ class RSSToJson
         }
 
         if ($target['ip'] !== null) {
-            $address = strpos($target['ip'], ':') === false ? $target['ip'] : '[' . $target['ip'] . ']';
-            curl_setopt_array($ch, [
-                // Connect to the address that was checked, not a fresh lookup.
-                CURLOPT_RESOLVE => [sprintf('%s:%d:%s', $target['host'], $target['port'], $address)],
-                // A proxy would make its own connection, out of our sight.
-                CURLOPT_PROXY => '',
-            ]);
+            // A proxy would make its own connection, out of our sight.
+            curl_setopt($ch, CURLOPT_PROXY, '');
+
+            // Connect to the address that was checked, not a fresh lookup.
+            // An IP literal involves no lookup, so there is nothing to pin.
+            if (filter_var($target['host'], FILTER_VALIDATE_IP) === false) {
+                $address = strpos($target['ip'], ':') === false ? $target['ip'] : '[' . $target['ip'] . ']';
+                curl_setopt($ch, CURLOPT_RESOLVE, [sprintf('%s:%d:%s', $target['host'], $target['port'], $address)]);
+            }
+        }
+
+        // PHP 8.4+ with libcurl 7.80+ can check the connected address before
+        // the request is sent, as a second line of defence after the pin.
+        $refusedIp = null;
+        $prereqOption = defined('CURLOPT_PREREQFUNCTION') ? constant('CURLOPT_PREREQFUNCTION') : null;
+        if ($target['ip'] !== null && is_int($prereqOption)) {
+            $abort = constant('CURL_PREREQFUNC_ABORT');
+            $proceed = constant('CURL_PREREQFUNC_OK');
+            curl_setopt($ch, $prereqOption, function ($handle, string $primaryIp) use (&$refusedIp, $abort, $proceed) {
+                if (!$this->isAddressAllowed($primaryIp)) {
+                    $refusedIp = $primaryIp;
+                    return $abort;
+                }
+                return $proceed;
+            });
         }
 
         $ok = curl_exec($ch);
@@ -598,8 +629,13 @@ class RSSToJson
             $this->lastError = sprintf('Response from %s is larger than max_size (%d bytes)', $url, $maxSize);
             return null;
         }
+        if ($refusedIp !== null) {
+            $this->lastError = sprintf('Refusing to connect to %s (%s): private or reserved address', $target['host'], $refusedIp);
+            return null;
+        }
         if ($target['ip'] !== null && $primaryIp !== '' && !$this->isAddressAllowed($primaryIp)) {
-            // Backstop: should not happen while the address is pinned.
+            // Backstop for PHP before 8.4: should not happen while the
+            // address is pinned, and the response is discarded.
             $this->lastError = sprintf('Refusing response from %s (%s): private or reserved address', $target['host'], $primaryIp);
             return null;
         }
