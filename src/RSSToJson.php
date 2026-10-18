@@ -26,9 +26,72 @@ namespace TomGould\RSSToJson;
 class RSSToJson
 {
     /**
+     * Defaults for the constructor options.
+     */
+    private const DEFAULT_OPTIONS = [
+        'timeout' => 10,
+        'connect_timeout' => 5,
+        'max_redirects' => 5,
+        'max_size' => 20971520,
+        'user_agent' => 'RSStoJSON/1.0 (+http://dealmobile.co.uk)',
+    ];
+
+    /**
+     * @var array{timeout: int|float, connect_timeout: int|float, max_redirects: int, max_size: int, user_agent: string}
+     */
+    private $options;
+
+    /**
      * @var string|null
      */
     private $lastError;
+
+    /**
+     * All options are optional, and only affect fetching from a URL.
+     *
+     * - timeout (int|float, default 10): seconds allowed for the whole fetch,
+     *   redirects included.
+     * - connect_timeout (int|float, default 5): seconds allowed to connect.
+     * - max_redirects (int, default 5): redirects to follow; 0 follows none.
+     * - max_size (int, default 20971520, i.e. 20 MiB): largest response body
+     *   accepted, in bytes.
+     * - user_agent (string): the User-Agent header to send.
+     *
+     * @param array<string, mixed> $options
+     * @throws \InvalidArgumentException For an unknown option or an invalid value
+     */
+    public function __construct(array $options = [])
+    {
+        foreach (array_keys($options) as $name) {
+            if (!array_key_exists($name, self::DEFAULT_OPTIONS)) {
+                throw new \InvalidArgumentException(sprintf('Unknown option "%s"', $name));
+            }
+        }
+        $options += self::DEFAULT_OPTIONS;
+
+        foreach (['timeout', 'connect_timeout'] as $name) {
+            if (!(is_int($options[$name]) || is_float($options[$name])) || $options[$name] <= 0) {
+                throw new \InvalidArgumentException(sprintf('Option "%s" must be a positive number of seconds', $name));
+            }
+        }
+        if (!is_int($options['max_redirects']) || $options['max_redirects'] < 0) {
+            throw new \InvalidArgumentException('Option "max_redirects" must be an integer of 0 or more');
+        }
+        if (!is_int($options['max_size']) || $options['max_size'] < 1) {
+            throw new \InvalidArgumentException('Option "max_size" must be a positive integer (bytes)');
+        }
+        if (!is_string($options['user_agent'])) {
+            throw new \InvalidArgumentException('Option "user_agent" must be a string');
+        }
+
+        $this->options = [
+            'timeout' => $options['timeout'],
+            'connect_timeout' => $options['connect_timeout'],
+            'max_redirects' => $options['max_redirects'],
+            'max_size' => $options['max_size'],
+            'user_agent' => $options['user_agent'],
+        ];
+    }
 
     /**
      * Load and parse a feed from a URL or a local file.
@@ -53,6 +116,10 @@ class RSSToJson
 
     /**
      * Fetch a feed over http or https and parse it.
+     *
+     * Other schemes are refused, including on redirects. Timeouts, the
+     * redirect limit and the response size cap come from the constructor
+     * options.
      *
      * @param string $url
      * @return array<string, mixed>|null The parsed feed, or null on failure (see getLastError())
@@ -278,34 +345,172 @@ class RSSToJson
     }
 
     /**
-     * Fetch remote feed via cURL.
+     * Fetch a feed over http or https.
+     *
+     * Redirects are followed here rather than by cURL so that every hop is
+     * checked by checkUrl() before it is requested. Only XML content types
+     * with a 2xx status are accepted.
      *
      * @param string $url
      * @return string|null
      */
     private function fetchRemoteFeed(string $url): ?string
     {
-        $ch = curl_init($url);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
-        curl_setopt($ch, CURLOPT_TIMEOUT, 10);
-        curl_setopt($ch, CURLOPT_USERAGENT, 'RSStoJSON/1.0 (+http://dealmobile.co.uk)');
-        curl_setopt($ch, CURLOPT_HTTPHEADER, [
-            'Accept: application/rss+xml, application/atom+xml, application/xml;q=0.9, */*;q=0.8'
-        ]);
+        $deadline = microtime(true) + $this->options['timeout'];
+        $redirects = 0;
 
-        $data = curl_exec($ch);
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $contentType = curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
+        while (true) {
+            if (!$this->checkUrl($url)) {
+                return null;
+            }
 
-        // PHP 7.4 compatible: use stripos instead of str_contains
-        if ($contentType === false || stripos($contentType, 'xml') === false) {
-            curl_close($ch);
+            $response = $this->request($url, $deadline);
+            if ($response === null) {
+                return null;
+            }
+
+            if ($response['status'] >= 300 && $response['status'] < 400 && $response['location'] !== '') {
+                if ($redirects >= $this->options['max_redirects']) {
+                    $this->lastError = sprintf('Too many redirects (max_redirects is %d)', $this->options['max_redirects']);
+                    return null;
+                }
+                $redirects++;
+                $url = $response['location'];
+                continue;
+            }
+
+            if (stripos($response['content_type'], 'xml') === false) {
+                $this->lastError = sprintf('Not an XML response (Content-Type "%s") from %s', $response['content_type'], $url);
+                return null;
+            }
+            if ($response['status'] < 200 || $response['status'] >= 300) {
+                $this->lastError = sprintf('HTTP %d from %s', $response['status'], $url);
+                return null;
+            }
+
+            return $response['body'];
+        }
+    }
+
+    /**
+     * Check that a URL may be requested: it must be absolute and use http or
+     * https.
+     *
+     * @param string $url
+     * @return bool
+     */
+    private function checkUrl(string $url): bool
+    {
+        $parts = parse_url($url);
+        $scheme = strtolower($parts['scheme'] ?? '');
+        if ($scheme !== '' && $scheme !== 'http' && $scheme !== 'https') {
+            $this->lastError = sprintf('Refusing %s URL: only http and https are allowed', $scheme);
+            return false;
+        }
+        if ($scheme === '' || !isset($parts['host']) || $parts['host'] === '') {
+            $this->lastError = "Invalid URL: $url";
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Make a single GET request without following redirects.
+     *
+     * @param string $url
+     * @param float $deadline microtime(true) value by which the whole fetch must finish
+     * @return array{status: int, content_type: string, location: string, body: string}|null
+     */
+    private function request(string $url, float $deadline): ?array
+    {
+        $remainingMs = (int) floor(($deadline - microtime(true)) * 1000);
+        if ($remainingMs < 1) {
+            $this->lastError = sprintf('Timed out after %s seconds', $this->options['timeout']);
             return null;
         }
-        curl_close($ch);
 
-        return ($httpCode >= 200 && $httpCode < 300) ? $data : null;
+        $ch = curl_init();
+        if ($ch === false) {
+            $this->lastError = 'Could not initialise cURL';
+            return null;
+        }
+
+        $body = '';
+        $tooLarge = false;
+        $maxSize = $this->options['max_size'];
+
+        curl_setopt_array($ch, [
+            CURLOPT_URL => $url,
+            CURLOPT_FOLLOWLOCATION => false,
+            // Lets sub-second timeouts work with the synchronous resolver.
+            CURLOPT_NOSIGNAL => true,
+            CURLOPT_CONNECTTIMEOUT_MS => min($remainingMs, (int) ceil($this->options['connect_timeout'] * 1000)),
+            CURLOPT_TIMEOUT_MS => $remainingMs,
+            // Refuses early when the server announces a larger Content-Length.
+            CURLOPT_MAXFILESIZE => $maxSize,
+            CURLOPT_USERAGENT => $this->options['user_agent'],
+            CURLOPT_HTTPHEADER => [
+                'Accept: application/rss+xml, application/atom+xml, application/xml;q=0.9, */*;q=0.8'
+            ],
+            // Enforces the cap while downloading, whatever the headers said.
+            CURLOPT_WRITEFUNCTION => static function ($handle, string $chunk) use (&$body, &$tooLarge, $maxSize): int {
+                if (strlen($body) + strlen($chunk) > $maxSize) {
+                    $tooLarge = true;
+                    return 0; // Anything other than strlen($chunk) aborts the transfer.
+                }
+                $body .= $chunk;
+                return strlen($chunk);
+            },
+        ]);
+        $this->restrictProtocols($ch);
+
+        $ok = curl_exec($ch);
+        $errno = curl_errno($ch);
+        $error = curl_error($ch);
+        $status = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $contentType = curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
+        $location = curl_getinfo($ch, CURLINFO_REDIRECT_URL);
+        if (\PHP_VERSION_ID < 80000) {
+            // A no-op since PHP 8.0 and deprecated in 8.5.
+            curl_close($ch);
+        }
+
+        if ($tooLarge || $errno === 63) { // 63 is CURLE_FILESIZE_EXCEEDED
+            $this->lastError = sprintf('Response from %s is larger than max_size (%d bytes)', $url, $maxSize);
+            return null;
+        }
+        if ($ok === false || $errno !== 0) {
+            $this->lastError = sprintf('Request to %s failed: %s', $url, $error !== '' ? $error : "cURL error $errno");
+            return null;
+        }
+
+        return [
+            'status' => $status,
+            'content_type' => is_string($contentType) ? $contentType : '',
+            'location' => is_string($location) ? $location : '',
+            'body' => $body,
+        ];
+    }
+
+    /**
+     * Limit cURL to http and https, for the request and for any redirect.
+     *
+     * @param resource|\CurlHandle $ch
+     */
+    private function restrictProtocols($ch): void
+    {
+        // libcurl 7.85 deprecated the bitmask options in favour of the string
+        // ones, which PHP exposes from 8.3.
+        if (defined('CURLOPT_PROTOCOLS_STR') && defined('CURLOPT_REDIR_PROTOCOLS_STR')
+            && curl_setopt($ch, constant('CURLOPT_PROTOCOLS_STR'), 'http,https')
+            && curl_setopt($ch, constant('CURLOPT_REDIR_PROTOCOLS_STR'), 'http,https')
+        ) {
+            return;
+        }
+
+        curl_setopt($ch, CURLOPT_PROTOCOLS, CURLPROTO_HTTP | CURLPROTO_HTTPS);
+        curl_setopt($ch, CURLOPT_REDIR_PROTOCOLS, CURLPROTO_HTTP | CURLPROTO_HTTPS);
     }
 
     /**
