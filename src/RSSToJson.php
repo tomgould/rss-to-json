@@ -78,7 +78,9 @@ class RSSToJson
         $channel = $xml->channel ?? $xml;
         $parsedChannel = $this->parseElement($channel, $namespaces);
 
-        $items = $channel->item ?? $xml->entry ?? [];
+        // RSS 0.9x/2.0 keep items inside <channel>, RSS 1.0 (RDF) puts them
+        // beside it under the root, and Atom calls them <entry>.
+        $items = $channel->item ?? $xml->item ?? $xml->entry ?? [];
         $parsedItems = [];
         foreach ($items as $item) {
             $parsedItems[] = $this->parseElement($item, $namespaces);
@@ -151,15 +153,21 @@ class RSSToJson
             $data['@attributes'][$attrName] = (string)$attrValue;
         }
 
-        // Handle namespaces
-        foreach ($namespaces as $prefix => $ns) {
-            foreach ($element->children($ns) as $childName => $child) {
+        // Prefixed children, e.g. media:content. Match on the prefix rather
+        // than the namespace URI so that an element is only ever read once:
+        // the default namespace (prefix '') is covered by children() below,
+        // and a URI bound to two prefixes no longer yields two copies.
+        foreach (array_keys($namespaces) as $prefix) {
+            if ($prefix === '') {
+                continue;
+            }
+            foreach ($element->children($prefix, true) as $childName => $child) {
                 $qualifiedName = $prefix . ':' . $childName;
                 $data[$qualifiedName][] = $this->parseElement($child, $namespaces);
             }
         }
 
-        // Regular children (non-namespaced)
+        // Unprefixed children, in no namespace or the default namespace
         foreach ($element->children() as $childName => $child) {
             $data[$childName][] = $this->parseElement($child, $namespaces);
         }

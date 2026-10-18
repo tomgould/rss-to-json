@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0"
+     xmlns:dc="http://purl.org/dc/elements/1.1/"
+     xmlns:content="http://purl.org/rss/1.0/modules/content/"
+     xmlns:media="http://search.yahoo.com/mrss/">
+  <channel>
+    <title>Modules Example</title>
+    <link>https://example.net/</link>
+    <description>RSS 2.0 using Dublin Core, content and Media RSS</description>
+    <dc:language>en</dc:language>
+    <item>
+      <title>Video with show notes</title>
+      <link>https://example.net/videos/1</link>
+      <dc:creator>Alice Smith</dc:creator>
+      <dc:creator>Bob Jones</dc:creator>
+      <dc:date>2026-10-17T12:00:00Z</dc:date>
+      <description>Short description</description>
+      <content:encoded><![CDATA[<p>Show notes with a <a href="https://example.net/?a=1&b=2">link</a> & more.</p>]]></content:encoded>
+      <media:group>
+        <media:content url="https://example.net/videos/1-hd.mp4" type="video/mp4" medium="video" width="1920" height="1080" isDefault="true"/>
+        <media:content url="https://example.net/videos/1-sd.mp4" type="video/mp4" medium="video" width="640" height="360"/>
+      </media:group>
+      <media:thumbnail url="https://example.net/thumbs/1.jpg" width="640" height="360"/>
+      <media:credit role="author" scheme="urn:ebu">Alice Smith</media:credit>
+      <media:rating scheme="urn:simple">nonadult</media:rating>
+    </item>
+  </channel>
+</rss>
