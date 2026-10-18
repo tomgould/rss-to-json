@@ -7,27 +7,36 @@
   "authors": [
     {
       "name": "Tom Gould",
-      "email": "your-email@example.com"
+      "email": "tom@dealmobile.co.uk"
     }
   ],
+  "support": {
+    "issues": "https://github.com/tomgould/rss-to-json/issues",
+    "source": "https://github.com/tomgould/rss-to-json"
+  },
   "autoload": {
     "psr-4": {
       "TomGould\\RSSToJson\\": "src/"
     }
   },
+  "autoload-dev": {
+    "psr-4": {
+      "TomGould\\RSSToJson\\Tests\\": "tests/"
+    }
+  },
   "bin": ["bin/rsstojson"],
   "require": {
     "php": ">=7.4",
+    "ext-curl": "*",
     "ext-libxml": "*",
-    "ext-curl": "*"
+    "ext-simplexml": "*"
   },
   "require-dev": {
-    "phpunit/phpunit": "^9.5"
+    "phpunit/phpunit": "^9.6"
   },
   "scripts": {
-    "test": "phpunit --bootstrap vendor/autoload.php tests"
+    "test": "phpunit"
   },
   "minimum-stability": "stable",
   "prefer-stable": true
 }
-

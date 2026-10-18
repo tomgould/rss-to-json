@@ -1,5 +1,7 @@
 <?php
 
+namespace TomGould\RSSToJson\Tests;
+
 use PHPUnit\Framework\TestCase;
 use TomGould\RSSToJson\RSSToJson;
 
