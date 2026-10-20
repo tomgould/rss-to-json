@@ -2,7 +2,7 @@
 
 All notable changes to this project are documented here. The project follows [Semantic Versioning](https://semver.org/).
 
-## [2.1.0] - Unreleased
+## [2.1.0] - 2026-10-18
 
 The public API is backward compatible: `new RSSToJson()` and `parse()` work as before, and everything new is additive.
 
@@ -63,7 +63,7 @@ The public API is backward compatible: `new RSSToJson()` and `parse()` work as b
 
 - First release.
 
-[2.1.0]: https://github.com/tomgould/rss-to-json/compare/v2.0.1...v2.1
+[2.1.0]: https://github.com/tomgould/rss-to-json/compare/v2.0.1...v2.1.0
 [2.0.1]: https://github.com/tomgould/rss-to-json/compare/v2.0.0...v2.0.1
 [2.0.0]: https://github.com/tomgould/rss-to-json/compare/v1.0.2...v2.0.0
 [1.0.2]: https://github.com/tomgould/rss-to-json/compare/v1.0.1...v1.0.2
