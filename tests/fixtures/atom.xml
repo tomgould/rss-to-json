@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>Example Blog</title>
+  <subtitle>Notes and updates</subtitle>
+  <link href="https://example.org/feed.atom" rel="self"/>
+  <link href="https://example.org/"/>
+  <id>urn:uuid:60a76c80-d399-11d9-b93C-0003939e0af6</id>
+  <updated>2026-10-17T18:30:02Z</updated>
+  <author>
+    <name>Jane Doe</name>
+    <email>jane@example.org</email>
+  </author>
+  <entry>
+    <title>Atom-Powered Robots Run Amok</title>
+    <link href="https://example.org/2026/10/17/robots"/>
+    <id>urn:uuid:1225c695-cfb8-4ebb-aaaa-80da344efa6a</id>
+    <updated>2026-10-17T18:30:02Z</updated>
+    <summary>Some text.</summary>
+    <category term="robots"/>
+  </entry>
+  <entry>
+    <title type="html">Second &lt;em&gt;entry&lt;/em&gt;</title>
+    <link rel="alternate" type="text/html" href="https://example.org/2026/10/16/second"/>
+    <id>urn:uuid:1225c695-cfb8-4ebb-aaaa-80da344efa6b</id>
+    <updated>2026-10-16T10:00:00Z</updated>
+    <content type="html"><![CDATA[<p>Hello & welcome</p>]]></content>
+  </entry>
+</feed>

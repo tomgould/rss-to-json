@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:media="http://search.yahoo.com/mrss/" xmlns:dcterms="http://purl.org/dc/terms/">
+    <channel>
+        <title>Sample Video Feed</title>
+        <link>https://example.com/videos</link>
+        <description>A sample MRSS feed for testing</description>
+        <language>en-us</language>
+
+        <item>
+            <title>Introduction to RSS Feeds</title>
+            <link>https://example.com/videos/intro-rss</link>
+            <description>Learn all about RSS feeds in this comprehensive tutorial</description>
+            <pubDate>Mon, 01 Jan 2024 12:00:00 GMT</pubDate>
+            <guid>https://example.com/videos/intro-rss</guid>
+
+            <media:content url="https://example.com/videos/intro-rss.mp4" type="video/mp4" duration="300" width="1920" height="1080">
+                <media:title>Introduction to RSS Feeds</media:title>
+                <media:description>Learn all about RSS feeds in this comprehensive tutorial</media:description>
+            </media:content>
+
+            <media:thumbnail url="https://example.com/thumbs/intro-rss.jpg" width="640" height="360" />
+
+            <media:category>Technology</media:category>
+            <media:keywords>RSS, feeds, tutorial, web development</media:keywords>
+        </item>
+
+        <item>
+            <title>Advanced XML Parsing</title>
+            <link>https://example.com/videos/xml-parsing</link>
+            <description>Deep dive into XML parsing techniques</description>
+            <pubDate>Tue, 02 Jan 2024 14:30:00 GMT</pubDate>
+            <guid>https://example.com/videos/xml-parsing</guid>
+
+            <media:content url="https://example.com/videos/xml-parsing.mp4" type="video/mp4" duration="450" width="1920" height="1080">
+                <media:title>Advanced XML Parsing</media:title>
+                <media:description>Deep dive into XML parsing techniques</media:description>
+            </media:content>
+
+            <media:thumbnail url="https://example.com/thumbs/xml-parsing.jpg" width="640" height="360" />
+
+            <media:category>Programming</media:category>
+            <media:keywords>XML, parsing, PHP, programming</media:keywords>
+        </item>
+
+        <item>
+            <title>Building REST APIs</title>
+            <link>https://example.com/videos/rest-apis</link>
+            <description>A complete guide to building RESTful APIs with PHP</description>
+            <pubDate>Wed, 03 Jan 2024 10:15:00 GMT</pubDate>
+            <guid>https://example.com/videos/rest-apis</guid>
+
+            <media:content url="https://example.com/videos/rest-apis.mp4" type="video/mp4" duration="600" width="1920" height="1080">
+                <media:title>Building REST APIs</media:title>
+                <media:description>A complete guide to building RESTful APIs with PHP</media:description>
+            </media:content>
+
+            <media:thumbnail url="https://example.com/thumbs/rest-apis.jpg" width="640" height="360" />
+
+            <media:category>Web Development</media:category>
+            <media:keywords>REST, API, PHP, web services</media:keywords>
+        </item>
+    </channel>
+</rss>
+

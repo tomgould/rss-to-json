@@ -1,0 +1,45 @@
+#!/usr/bin/env php
+<?php
+
+// Try to find the autoload file in different possible locations
+$autoloadPaths = [
+    __DIR__ . '/../../../autoload.php',  // Installed as a dependency
+    __DIR__ . '/../vendor/autoload.php', // Installed in development
+];
+
+$autoloadFound = false;
+foreach ($autoloadPaths as $path) {
+    if (file_exists($path)) {
+        require $path;
+        $autoloadFound = true;
+        break;
+    }
+}
+
+if (!$autoloadFound) {
+    fwrite(STDERR, "Error: Could not find Composer autoload file.\n");
+    exit(1);
+}
+
+use TomGould\RSSToJson\RSSToJson;
+
+if ($argc < 2) {
+    fwrite(STDERR, "Usage: rsstojson <url-or-path>\n");
+    exit(1);
+}
+
+if (!file_exists($argv[1]) && !filter_var($argv[1], FILTER_VALIDATE_URL)) {
+    fwrite(STDERR, "Error: Invalid file path or URL.\n");
+    exit(3);
+}
+
+$parser = new RSSToJson();
+$result = $parser->parse($argv[1]);
+
+if ($result === null) {
+    fwrite(STDERR, "Failed to parse feed: " . $parser->getLastError() . "\n");
+    exit(2);
+}
+
+echo json_encode($result, JSON_PRETTY_PRINT) . PHP_EOL;
+

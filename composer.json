@@ -1,0 +1,44 @@
+{
+  "name": "tomgould/rsstojson",
+  "description": "Universal RSS/Atom/XML parser that outputs clean JSON-compatible arrays.",
+  "type": "library",
+  "license": "MIT",
+  "keywords": ["rss", "atom", "xml", "mrss", "feed", "parser", "json"],
+  "authors": [
+    {
+      "name": "Tom Gould",
+      "email": "tom@dealmobile.co.uk"
+    }
+  ],
+  "support": {
+    "issues": "https://github.com/tomgould/rss-to-json/issues",
+    "source": "https://github.com/tomgould/rss-to-json"
+  },
+  "autoload": {
+    "psr-4": {
+      "TomGould\\RSSToJson\\": "src/"
+    }
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "TomGould\\RSSToJson\\Tests\\": "tests/"
+    }
+  },
+  "bin": ["bin/rsstojson"],
+  "require": {
+    "php": ">=7.4",
+    "ext-curl": "*",
+    "ext-libxml": "*",
+    "ext-simplexml": "*"
+  },
+  "require-dev": {
+    "phpunit/phpunit": "^9.6",
+    "phpstan/phpstan": "^2.1"
+  },
+  "scripts": {
+    "test": "phpunit",
+    "analyse": "phpstan analyse"
+  },
+  "minimum-stability": "stable",
+  "prefer-stable": true
+}

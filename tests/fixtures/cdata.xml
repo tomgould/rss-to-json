@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title><![CDATA[Tom & Jerry's <Feed>]]></title>
+    <link>https://example.com/</link>
+    <description><![CDATA[Contains &amp; an escaped entity, kept literally]]></description>
+    <item>
+      <title><![CDATA[Fish & Chips]]></title>
+      <description>Mixed <![CDATA[<b>bold</b>]]> text</description>
+    </item>
+  </channel>
+</rss>
