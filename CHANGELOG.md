@@ -2,6 +2,18 @@
 
 All notable changes to this project are documented here. The project follows [Semantic Versioning](https://semver.org/).
 
+## [2.1.1] - 2026-11-23
+
+Published on a new single-commit history. The 2.1.0 tag pointed at a commit that is no longer in the repository, so this release replaces it on Packagist. The code is unchanged from 2.1.0.
+
+### Added
+
+- `SECURITY.md`: how to report a vulnerability.
+
+### Changed
+
+- Changelog wording tidied.
+
 ## [2.1.0] - 2026-10-18
 
 The public API is backward compatible: `new RSSToJson()` and `parse()` work as before, and everything new is additive.
